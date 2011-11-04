@@ -14,7 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import sys
+import time
+
 from setuptools import setup, find_packages
+
+TOPDIR = os.path.abspath(os.path.dirname(__file__))
+VFILE  = os.path.join(TOPDIR, 'swift', '__pistonversion__.py')
+
+args = filter(lambda x: x[0] != '-', sys.argv)
+command = args[1] if len(args) > 1 else ''
+
+if command == 'sdist':
+    PISTON_VERSION = os.environ['PISTON_VERSION']
+    with file(VFILE, 'w') as f:
+        f.write('''#!/usr/bin/env python\nVERSION = '%s'\n''' % PISTON_VERSION)
+elif command == 'develop':
+    PISTON_VERSION = time.strftime('9999.0.%Y%m%d%H%M%S', time.localtime())
+    with file(VFILE, 'w') as f:
+        f.write('''#!/usr/bin/env python\nVERSION = '%s'\n''' % PISTON_VERSION)
+elif command is None:
+    PISTON_VERSION = '9999999999-You_did_not_set_a_version'
+else:
+    assert os.path.exists(VFILE), 'version.py does not exist, please set PISTON_VERSION (or run make_version.py for dev purposes)'
 
 from swift import __canonical_version__ as version
 

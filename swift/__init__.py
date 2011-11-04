@@ -1,5 +1,5 @@
 import gettext
-
+from . import __pistonversion__
 
 class Version(object):
     def __init__(self, canonical_version, final):
@@ -14,7 +14,7 @@ class Version(object):
             return '%s-dev' % (self.canonical_version,)
 
 
-_version = Version('1.4.4', True)
+_version = Version(__pistonversion__.VERSION, True)
 __version__ = _version.pretty_version
 __canonical_version__ = _version.canonical_version
 
