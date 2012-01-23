@@ -161,23 +161,7 @@ def http_connection(url, proxy=None):
     return parsed, conn
 
 
-def get_auth(url, user, key, snet=False):
-    """
-    Get authentication/authorization credentials.
-
-    The snet parameter is used for Rackspace's ServiceNet internal network
-    implementation. In this function, it simply adds *snet-* to the beginning
-    of the host name for the returned storage URL. With Rackspace Cloud Files,
-    use of this network path causes no bandwidth charges but requires the
-    client to be running on Rackspace's ServiceNet network.
-
-    :param url: authentication/authorization URL
-    :param user: user to authenticate as
-    :param key: key or password for authorization
-    :param snet: use SERVICENET internal network (see above), default is False
-    :returns: tuple of (storage URL, auth token)
-    :raises ClientException: HTTP GET request to auth URL failed
-    """
+def _get_auth_v1_0(url, user, key, snet):
     parsed, conn = http_connection(url)
     conn.request('GET', parsed.path, '',
                  {'X-Auth-User': user, 'X-Auth-Key': key})
@@ -196,6 +180,88 @@ def get_auth(url, user, key, snet=False):
         url = urlunparse(parsed)
     return url, resp.getheader('x-storage-token',
                                                 resp.getheader('x-auth-token'))
+
+
+def _get_auth_v2_0(url, user, key, snet):
+    if ':' in user:
+        tenant, user = user.split(':')
+    else:
+        tenant = user
+
+    def json_request(method, token_url, **kwargs):
+        kwargs.setdefault('headers', {})
+        if 'body' in kwargs:
+            kwargs['headers']['Content-Type'] = 'application/json'
+            kwargs['body'] = json_dumps(kwargs['body'])
+        parsed, conn = http_connection(token_url)
+        conn.request(method, parsed.path, **kwargs)
+        resp = conn.getresponse()
+        body = resp.read()
+        if body:
+            try:
+                body = json_loads(body)
+            except ValueError:
+                pass
+        else:
+            body = None
+        if resp.status < 200 or resp.status >= 300:
+            raise ClientException('Auth GET failed', http_scheme=parsed.scheme,
+                                  http_host=conn.host,
+                                  http_port=conn.port,
+                                  http_path=parsed.path,
+                                  http_status=resp.status,
+                                  http_reason=resp.reason)
+        return resp, body
+    body = {"auth": {"tenantName": tenant,
+                     "passwordCredentials":
+                         {"username": user, "password": key}}}
+    token_url = urljoin(url, "tokens")
+    resp, body = json_request("POST", token_url, body=body)
+    token_id = None
+    try:
+        url = None
+        catalogs = body['access']['serviceCatalog']
+        for service in catalogs:
+            if service['type'] == 'object-store':
+                url = service['endpoints'][0]['publicURL']
+        token_id = body['access']['token']['id']
+        if not url:
+            raise ClientException("There is no object-store endpoint " \
+                                  "on this auth server.")
+    except(KeyError, IndexError):
+        raise ClientException("Error while getting answers from auth server")
+
+    if snet:
+        parsed = list(urlparse(url))
+        # Second item in the list is the netloc
+        parsed[1] = 'snet-' + parsed[1]
+        url = urlunparse(parsed)
+
+    return url, token_id
+
+
+def get_auth(url, user, key, snet=False, auth_version="1.0"):
+    """
+    Get authentication/authorization credentials.
+
+    The snet parameter is used for Rackspace's ServiceNet internal network
+    implementation. In this function, it simply adds *snet-* to the beginning
+    of the host name for the returned storage URL. With Rackspace Cloud Files,
+    use of this network path causes no bandwidth charges but requires the
+    client to be running on Rackspace's ServiceNet network.
+
+    :param url: authentication/authorization URL
+    :param user: user to authenticate as
+    :param key: key or password for authorization
+    :param snet: use SERVICENET internal network (see above), default is False
+    :param auth_version: OpenStack authentication version (default is 1.0)
+    :returns: tuple of (storage URL, auth token)
+    :raises ClientException: HTTP GET request to auth URL failed
+    """
+    if auth_version == "1.0" or auth_version == "1":
+        return _get_auth_v1_0(url, user, key, snet)
+    elif auth_version == "2.0" or auth_version == "2":
+        return _get_auth_v2_0(url, user, key, snet)
 
 
 def get_account(url, token, marker=None, limit=None, prefix=None,
