@@ -802,7 +802,8 @@ class Connection(object):
     """Convenience class to make requests that will also retry the request"""
 
     def __init__(self, authurl, user, key, retries=5, preauthurl=None,
-                 preauthtoken=None, snet=False, starting_backoff=1):
+                 preauthtoken=None, snet=False, starting_backoff=1, 
+                 auth_version="1.0"):
         """
         :param authurl: authenitcation URL
         :param user: user name to authenticate as
@@ -823,9 +824,10 @@ class Connection(object):
         self.attempts = 0
         self.snet = snet
         self.starting_backoff = starting_backoff
+        self.auth_version = auth_version
 
     def get_auth(self):
-        return get_auth(self.authurl, self.user, self.key, snet=self.snet)
+        return get_auth(self.authurl, self.user, self.key, snet=self.snet, auth_version=self.auth_version)
 
     def http_connection(self):
         return http_connection(self.url)
