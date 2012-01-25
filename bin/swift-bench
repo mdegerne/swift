@@ -89,7 +89,11 @@ if __name__ == '__main__':
                       help='Number of GET operations to perform')
     parser.add_option('-x', '--no-delete', dest='delete', action='store_false',
                       help='If set, will not delete the objects created')
-
+    parser.add_option('-V', '--auth-version', dest='auth_version',
+                      default='1.0', type=str,
+                      help='Specify a version for authentication'\
+                          '(default: 1.0)')
+    
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
