@@ -21,7 +21,7 @@ from cStringIO import StringIO
 from re import compile, DOTALL
 from tokenize import generate_tokens, STRING, NAME, OP
 from urllib import quote as _quote, unquote
-from urlparse import urlparse, urlunparse
+from urlparse import urlparse, urlunparse, urljoin
 
 try:
     from eventlet.green.httplib import HTTPException, HTTPSConnection
@@ -56,10 +56,12 @@ def quote(value, safe='/'):
 try:
     # simplejson is popular and pretty good
     from simplejson import loads as json_loads
+    from simplejson import dumps as json_dumps
 except ImportError:
     try:
         # 2.6 will have a json module in the stdlib
         from json import loads as json_loads
+        from json import dumps as json_dumps
     except ImportError:
         # fall back on local parser otherwise
         comments = compile(r'/\*.*\*/|//[^\r\n]*', DOTALL)
@@ -802,7 +804,7 @@ class Connection(object):
     """Convenience class to make requests that will also retry the request"""
 
     def __init__(self, authurl, user, key, retries=5, preauthurl=None,
-                 preauthtoken=None, snet=False, starting_backoff=1, 
+                 preauthtoken=None, snet=False, starting_backoff=1,
                  auth_version="1.0"):
         """
         :param authurl: authenitcation URL
